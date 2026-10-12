@@ -10,7 +10,7 @@ spec.loader.exec_module(weekly)
 
 class TestWeekly(unittest.TestCase):
     def aggregate(self, rows, today=date(2026, 10, 13)):
-        return weekly.aggregate_weeks(rows, today, 'Pacific/Auckland')
+        return weekly.aggregate_weeks(rows, today, 'Pacific/Auckland', weeks=12)
 
     def row(self, id='1', type='Run', day='2026-10-12', **fields):
         return dict(id=id, type=type, start_date_local=day+'T09:00:00', **fields)
@@ -55,6 +55,20 @@ class TestWeekly(unittest.TestCase):
         result=self.aggregate(rows)
         self.assertEqual(result['current_week']['sessions'],0)
         self.assertEqual(result['invalid_dates'],1)
+
+    def test_daily_and_ignored_time(self):
+        r=self.aggregate([self.row(moving_time=3600), self.row(id='2',moving_time=999,icu_ignore_time=True),dict(id='3',name='Restricted')])
+        self.assertEqual(r['daily'][0]['seconds'],3600)
+        self.assertEqual(r['current_week']['sessions'],1)
+        self.assertEqual(r['ignored_activities'],1)
+        self.assertEqual(r['unclassified_activities'],1)
+
+    def test_upstream_fitness_preserves_gaps_and_negative_form(self):
+        r=weekly.fitness_history([{'id':'2026-10-12','ctl':50,'atl':75},{'id':'2026-10-13','ctl':51,'atl':None},{'id':'2026-10-14','ctl':99,'atl':100}],date(2026,10,13))
+        self.assertEqual(len(r),2)
+        self.assertEqual(r[0]['form'],-25)
+        self.assertIsNone(r[1]['atl'])
+        self.assertIsNone(r[1]['form'])
 
     def test_unnamed_activity_and_other_sport(self):
         result=self.aggregate([self.row(type='Walk',moving_time=900)])

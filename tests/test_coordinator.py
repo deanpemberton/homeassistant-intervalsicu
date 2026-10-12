@@ -16,6 +16,7 @@ class TestWeeklyRefresh(IsolatedAsyncioTestCase):
         self.client = self.coordinator.client = MagicMock()
         self.client.get_athlete = AsyncMock(return_value={'id':'i123','name':'Test'})
         self.client.get_wellness = AsyncMock(return_value={})
+        self.client.get_wellness_range = AsyncMock(return_value=[])
         self.client.get_activities = AsyncMock(return_value=[])
         self.client.get_events = AsyncMock(return_value=[])
         self.client.get_pace_curves = AsyncMock(return_value={})
@@ -29,7 +30,7 @@ class TestWeeklyRefresh(IsolatedAsyncioTestCase):
         self.assertEqual(result.activities[0]['id'],'new')
         self.assertEqual(result.weekly_training['current_week']['hours'],0.5)
         args=self.client.get_activities.call_args.kwargs
-        self.assertEqual(args['oldest'].isoformat(),'2026-07-27')
+        self.assertEqual(args['oldest'].isoformat(),'2025-10-20')
         self.assertEqual(args['newest'].isoformat(),'2026-10-14')
         self.assertEqual(args['limit'],1000)
         self.client.get_activities.return_value=[]
@@ -45,3 +46,13 @@ class TestWeeklyRefresh(IsolatedAsyncioTestCase):
         self.client.get_activities.return_value=[{}]*1000
         with self.assertRaises(UpdateFailed):
             await self.coordinator._async_update_data()
+
+    async def test_daily_model_history_is_upstream_and_failure_is_independent(self):
+        self.client.get_wellness_range.return_value=[{'id':'2026-10-12','ctl':50,'atl':75}]
+        result=await self.coordinator._async_update_data()
+        self.assertEqual(result.weekly_training['fitness_history'][0]['form'],-25)
+        self.assertEqual(len(result.weekly_training['history']),52)
+        self.client.get_wellness_range.side_effect=IntervalsIcuApiError('offline')
+        result=await self.coordinator._async_update_data()
+        self.assertEqual(result.weekly_training['fitness_history_status'],'unavailable')
+        self.assertEqual(result.weekly_training['current_week']['hours'],0)

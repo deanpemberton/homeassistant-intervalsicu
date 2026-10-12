@@ -95,7 +95,7 @@ Data is polled from the Intervals.icu API every 2 hours. The calendar fetches ev
 ## Weekly training history (Fantail extension)
 
 The **Weekly training** sensor reports this week's total hours. Its attributes
-contain `current_week` and `history` (12 weeks including the current partial
+contain `current_week` and `history` (52 weeks including the current partial
 week), with `strength`, `swimming`, `cycling`, `running`, and `other` buckets.
 Each bucket exposes hours, seconds, distance in metres/km, session count,
 indoor seconds, virtual distance, and missing-measurement counts. Strength
@@ -119,3 +119,10 @@ refresh. Add a second integration entry with Laura's own athlete ID and authoris
 API key to keep athletes separate. Existing entity IDs and credentials are retained
 when replacing the upstream HACS package with this fork (same `intervals_icu` domain).
 Install only one repository for this domain. Restart HA after upgrading Python code.
+
+Version 0.3.0 adds daily completed-time buckets for consistency charts and upstream
+daily fitness/fatigue history from wellness records. Absolute form is the same-day
+CTL minus ATL difference. These are model metrics, not a subjective readiness score.
+Missing fitness samples remain gaps. Historical API failure withholds that chart
+while volume remains available. Activities marked `icu_ignore_time` are excluded;
+restricted summaries lacking a sport are counted in `unclassified_activities`.

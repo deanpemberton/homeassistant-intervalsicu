@@ -12,7 +12,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .api import IntervalsIcuApiError, IntervalsIcuClient, IntervalsIcuNotFoundError
 from .const import DEFAULT_SCAN_INTERVAL, DOMAIN
-from .weekly import aggregate_weeks
+from .weekly import aggregate_weeks, fitness_history
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -54,7 +54,7 @@ class IntervalsIcuCoordinator(DataUpdateCoordinator[IntervalsIcuData]):
         """Fetch data from the API."""
         today = dt_util.now().date()
         timezone = self.hass.config.time_zone
-        oldest = today - timedelta(days=today.weekday(), weeks=11)
+        oldest = today - timedelta(days=today.weekday(), weeks=51)
         try:
             athlete = await self.client.get_athlete()
         except IntervalsIcuApiError as err:
@@ -88,6 +88,15 @@ class IntervalsIcuCoordinator(DataUpdateCoordinator[IntervalsIcuData]):
             raise UpdateFailed("Activity history endpoint not found; totals withheld") from err
         except IntervalsIcuApiError as err:
             raise UpdateFailed(f"Error fetching activity history: {err}") from err
+
+        try:
+            fitness_rows = await self.client.get_wellness_range(oldest=oldest, newest=today)
+            weekly_training["fitness_history"] = fitness_history(fitness_rows, today)
+            weekly_training["fitness_history_status"] = "available"
+        except IntervalsIcuApiError as err:
+            _LOGGER.warning("Error fetching fitness history: %s", err)
+            weekly_training["fitness_history"] = []
+            weekly_training["fitness_history_status"] = "unavailable"
 
         try:
             events = await self.client.get_events(
