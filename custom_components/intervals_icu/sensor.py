@@ -140,6 +140,16 @@ def _sport_setting_available(key: str) -> Callable[[IntervalsIcuData], bool]:
 
 
 SENSOR_DESCRIPTIONS: tuple[IntervalsIcuSensorEntityDescription, ...] = (
+    IntervalsIcuSensorEntityDescription(
+        key="weekly_training",
+        name="Weekly training",
+        icon="mdi:chart-bar-stacked",
+        native_unit_of_measurement=UnitOfTime.HOURS,
+        device_class=SensorDeviceClass.DURATION,
+        value_fn=lambda data: data.weekly_training["current_week"]["hours"] if data.weekly_training else None,
+        available_fn=lambda data: data.weekly_training is not None,
+        attrs_fn=lambda data: dict(data.weekly_training, athlete_id=data.athlete.get("id"), athlete_name=data.athlete.get("name") or data.athlete.get("firstname")) if data.weekly_training else None,
+    ),
     # Wellness sensors
     IntervalsIcuSensorEntityDescription(
         key="weight",

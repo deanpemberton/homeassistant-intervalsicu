@@ -91,3 +91,31 @@ A calendar entity shows planned workouts, targets, notes, and races from your In
 ## Data Update
 
 Data is polled from the Intervals.icu API every 2 hours. The calendar fetches events on demand when browsing date ranges.
+
+## Weekly training history (Fantail extension)
+
+The **Weekly training** sensor reports this week's total hours. Its attributes
+contain `current_week` and `history` (12 weeks including the current partial
+week), with `strength`, `swimming`, `cycling`, `running`, and `other` buckets.
+Each bucket exposes hours, seconds, distance in metres/km, session count,
+indoor seconds, virtual distance, and missing-measurement counts. Strength
+distance is not meaningful; dashboards should show a dash.
+
+Weeks run Monday–Sunday. Recorded activity local dates take precedence; UTC
+dates fall back to the configured HA timezone. Strength/swim use elapsed time
+(including rests); run/bike use moving time, falling back to the other duration
+only when missing. Missing values are counted, never invented. All sport types
+not explicitly mapped are retained under `other`.
+
+Every two-hour refresh replaces the entire window, so corrections and deletions
+are reflected without double counting. Identical activity IDs count once; separate
+Garmin/Strava uploads with different IDs must be reconciled in Intervals itself.
+API failures or the 1000-row safety limit mark sensors unavailable rather than
+showing misleading zero totals. Historical chart data lives in attributes; this
+is not a backfill of HA recorder statistics.
+
+Use `homeassistant.update_entity` on the Weekly training sensor for a manual
+refresh. Add a second integration entry with Laura's own athlete ID and authorised
+API key to keep athletes separate. Existing entity IDs and credentials are retained
+when replacing the upstream HACS package with this fork (same `intervals_icu` domain).
+Install only one repository for this domain. Restart HA after upgrading Python code.

@@ -7,10 +7,12 @@ from datetime import date, timedelta
 from typing import Any
 
 from homeassistant.core import HomeAssistant
+from homeassistant.util import dt as dt_util
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import IntervalsIcuApiError, IntervalsIcuClient, IntervalsIcuNotFoundError
 from .const import DEFAULT_SCAN_INTERVAL, DOMAIN
+from .weekly import aggregate_weeks
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -25,12 +27,14 @@ class IntervalsIcuData:
         activities: list[dict[str, Any]],
         events: list[dict[str, Any]],
         pace_curve: dict[str, Any] | None,
+        weekly_training: dict[str, Any] | None = None,
     ) -> None:
         self.athlete = athlete
         self.wellness = wellness
         self.activities = activities
         self.events = events
         self.pace_curve = pace_curve
+        self.weekly_training = weekly_training
 
 
 class IntervalsIcuCoordinator(DataUpdateCoordinator[IntervalsIcuData]):
@@ -48,7 +52,9 @@ class IntervalsIcuCoordinator(DataUpdateCoordinator[IntervalsIcuData]):
 
     async def _async_update_data(self) -> IntervalsIcuData:
         """Fetch data from the API."""
-        today = date.today()
+        today = dt_util.now().date()
+        timezone = self.hass.config.time_zone
+        oldest = today - timedelta(days=today.weekday(), weeks=11)
         try:
             athlete = await self.client.get_athlete()
         except IntervalsIcuApiError as err:
@@ -65,17 +71,23 @@ class IntervalsIcuCoordinator(DataUpdateCoordinator[IntervalsIcuData]):
 
         try:
             all_activities = await self.client.get_activities(
-                oldest=today - timedelta(days=30),
-                newest=today,
-                limit=10,
+                oldest=oldest,
+                newest=today + timedelta(days=1),
+                limit=1000,
             )
-            # Filter out empty/wellness-only records that have no name
-            activities = [a for a in all_activities if a.get("name")]
-        except IntervalsIcuNotFoundError:
-            activities = []
+            if len(all_activities) >= 1000:
+                raise UpdateFailed("Activity history reached the 1000-row safety limit; totals withheld")
+            weekly_training = aggregate_weeks(all_activities, today, timezone)
+            weekly_training["last_synced"] = dt_util.utcnow().isoformat()
+            activities = sorted(
+                [a for a in all_activities if a.get("name") and a.get("type")],
+                key=lambda a: a.get("start_date_local") or a.get("start_date") or "",
+                reverse=True,
+            )
+        except IntervalsIcuNotFoundError as err:
+            raise UpdateFailed("Activity history endpoint not found; totals withheld") from err
         except IntervalsIcuApiError as err:
-            _LOGGER.warning("Error fetching activities: %s", err)
-            activities = []
+            raise UpdateFailed(f"Error fetching activity history: {err}") from err
 
         try:
             events = await self.client.get_events(
@@ -104,4 +116,5 @@ class IntervalsIcuCoordinator(DataUpdateCoordinator[IntervalsIcuData]):
             activities=activities,
             events=events,
             pace_curve=pace_curve,
+            weekly_training=weekly_training,
         )

@@ -1,12 +1,14 @@
 {
   "domain": "intervals_icu",
   "name": "Intervals.icu",
-  "codeowners": ["@jelmer"],
+  "codeowners": [
+    "@jelmer"
+  ],
   "config_flow": true,
-  "documentation": "https://github.com/jelmer/homeassistant-intervalsicu",
+  "documentation": "https://github.com/deanpemberton/homeassistant-intervalsicu",
   "integration_type": "hub",
   "iot_class": "cloud_polling",
-  "issue_tracker": "https://github.com/jelmer/homeassistant-intervalsicu/issues",
+  "issue_tracker": "https://github.com/deanpemberton/homeassistant-intervalsicu/issues",
   "requirements": [],
-  "version": "0.1.5"
+  "version": "0.2.0"
 }
